@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Árbol + contador</title>
+  <style>
+    :root{
+      --bg1:#FF0000;
+      --bg2:#FF5AA4;
+      --paper:#f6e7d8;
+      --paper2:#f1ddcc;
+      --ink:#3b2a1f;
+      --muted:#6b5a4f;
+      --shadow: 0 18px 50px rgba(0,0,0,.25);
+      --radius: 28px;
+    }
+    *{ box-sizing:border-box }
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% 20%, rgba(255,255,255,.18), transparent 60%),
+        radial-gradient(900px 500px at 80% 30%, rgba(255,255,255,.12), transparent 60%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      overflow:hidden;
+    }
+
+    .photo-row{
+  position:absolute;
+  bottom:26px;
+  left:70%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:24px;
+  align-items:center;
+  justify-content:center;
+  pointer-events:auto;
+}
+
+.photo-row img{
+  width:140px;
+  height:100px;
+  object-fit:cover;
+  border-radius:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+  transition:transform .3s ease, box-shadow .3s ease;
+}
+
+.photo-row img:hover{
+  transform:scale(1.05);
+  box-shadow:0 10px 28px rgba(0,0,0,.35);
+}
+
+    .card{
+      width:min(1200px, 96vw);
+      height:min(800px, 92vh);
+      background:var(--paper);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .canvasBox{
+      width:100%;
+      height:100%;
+      border-radius: calc(var(--radius) - 10px);
+      overflow:hidden;
+      background: linear-gradient(var(--paper), var(--paper2));
+      position:relative;
+    }
+
+    canvas{ width:100%; height:100%; display:block; }
+
+    /* Texto encima del canvas */
+    .overlay{
+      position:absolute;
+      inset:0;
+      padding:22px 26px;
+      pointer-events:none;
+      color:var(--ink);
+    }
+    .toLine{
+      font-weight:650;
+      font-size:16px;
+      margin:0 0 8px 0;
+      opacity:.92;
+    }
+    .msg{
+      margin:0;
+      max-width: 40%;
+      line-height:1.4;
+      font-size:15px;
+      font-weight:520;
+      opacity:.9;
+      white-space:pre-wrap;
+    }
+    .bottom{
+      position:absolute;
+      left:26px;
+      right:26px;
+      bottom:22px;
+      color:var(--muted);
+      font-size:12.5px;
+      font-weight:650;
+    }
+    .counter{
+      color:var(--ink);
+      font-size:13px;
+      font-weight:800;
+      margin-top:4px;
+    }
+    .line{
+      margin-top:10px;
+      height:2px;
+      background: rgba(70,40,20,.35);
+      border-radius:999px;
+      max-width: 86%;
+    }
+
+    @media (max-width: 780px){
+      .msg{ max-width: 70%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="canvasBox">
+      <canvas id="c"></canvas>
+
+      <div class="overlay">
+        <p class="toLine" id="toLine"></p>
+        <p class="msg" id="msg"></p>
+
+        <div class="bottom">
+          <div>Contigo no siento prisa, pero nunca quiero separarme de tu lado...</div>
+          <div class="counter" id="counter"></div>
+          <div class="line"></div>
+        </div>
+        <div class="photo-row">
+  <img src="img/foto1.jpeg" alt="Foto 1">
+  <img src="img/foto2.jpeg" alt="Foto 2">
+  <img src="img/foto3.jpeg" alt="Foto 3">
+  <img src="img/foto4.jpeg" alt="Foto 4">
+</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ====== PERSONALIZA AQUÍ ====== */
+const TO_LINE   = "Kikasete sono koe wo:";
+const MESSAGE   = "Se que quizá no soy la persona mas elocuente del mundo, pero lo que siento por ti es demasiado grande como para quedarme callado. Y si mis palabras no son perfectas, al menos son sinceras, desde que empezamos a hablar y a compartir mas tiempo juntos, algo dentro de mi cambio, no fue de golpe, fue poco a poco… en cada conversación, en cada risa, en cada momento sencillo que termino siendo especial solo porque estabas tu. Hay sentimientos que entraron en mi corazón sin pedirme permiso, y ahora ya forman parte de mi, cada día que comparto contigo lo guardo como algo valioso, porque mientras mas te conozco, mas admiro a la mujer que eres linda, atenta, llena de detalles que quizá tu misma no notas, pero que para mi lo significan todo, me encanta descubrir nuevas partes de ti, escuchar tus pensamientos, entender tu forma de ver las cosas, no quiero apresurar nada, pero si quiero ser honesto, me gustaría seguir a tu lado, seguir construyendo momentos, seguir creciendo juntos, seguir aprendiendo uno del otro, me encantaría ganarme tu corazón con paciencia, con hechos, con constancia… no solo con palabras.";
+const SINCE_DATE = "2026-01-20"; // YYYY-MM-DD
+/* ============================= */
+
+document.getElementById("toLine").textContent = TO_LINE;
+document.getElementById("msg").textContent = MESSAGE;
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let W=0,H=0,dpr=1;
+function fit(){
+  const box = canvas.parentElement.getBoundingClientRect();
+  dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(box.width * dpr);
+  canvas.height = Math.floor(box.height * dpr);
+  canvas.style.width = box.width + "px";
+  canvas.style.height = box.height + "px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W = box.width;
+  H = box.height;
+}
+window.addEventListener("resize", () => { fit(); reset(); });
+
+/* ===== Util ===== */
+const rand = (a,b)=> a + Math.random()*(b-a);
+const lerp = (a,b,t)=> a + (b-a)*t;
+const clamp = (x,a,b)=> Math.max(a, Math.min(b, x));
+
+/* ===== Contador ===== */
+function formatSince(iso){
+  const start = new Date(iso + "T00:00:00");
+  const now = new Date();
+  const diffMs = now - start;
+  const totalSec = Math.max(0, Math.floor(diffMs/1000));
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  return `${days} días ${hours} horas ${mins} minutos ${secs} segundos`;
+}
+function tickCounter(){
+  document.getElementById("counter").textContent = formatSince(SINCE_DATE);
+}
+setInterval(tickCounter, 1000);
+tickCounter();
+
+/* ===== Árbol por segmentos ===== */
+function buildTreeSegments(rootX, rootY){
+  const segs = [];
+  const baseLen = Math.min(H, W) * 0.22;
+  const levels = 7;
+
+  function branch(x,y, ang, len, lvl, tStart){
+    const x2 = x + Math.cos(ang)*len;
+    const y2 = y + Math.sin(ang)*len;
+
+    segs.push({
+      x1:x, y1:y, x2:x2, y2:y2,
+      w: lerp(10, 1.6, (lvl/levels)),
+      t0: tStart,
+      t1: tStart + lerp(0.10, 0.18, lvl/levels),
+      lvl
+    });
+
+    if(lvl >= levels) return;
+
+    const spread = lerp(0.95, 0.35, lvl/levels);
+    const len2 = len * rand(0.70, 0.82);
+
+    branch(x2,y2, ang - spread*rand(0.55,0.9), len2, lvl+1, tStart + 0.06);
+    branch(x2,y2, ang + spread*rand(0.55,0.9), len2, lvl+1, tStart + 0.06);
+
+    if(Math.random() < 0.30){
+      branch(x2,y2, ang + rand(-0.6,0.6), len2*rand(0.55,0.75), lvl+1, tStart + 0.08);
+    }
+  }
+
+  branch(rootX, rootY, -Math.PI/2 + rand(-0.06,0.06), baseLen, 0, 0.02);
+  return segs;
+}
+
+function getBranchTips(segs){
+  // tips: extremos de ramas del último nivel (lvl alto)
+  const maxLvl = Math.max(...segs.map(s=>s.lvl));
+  const tips = segs
+    .filter(s => s.lvl >= maxLvl-1) // últimas capas
+    .map(s => ({x:s.x2, y:s.y2}));
+  // reduce un poco para no saturar
+  const sampled = [];
+  for(const t of tips){
+    if(Math.random() < 0.55) sampled.push(t);
+  }
+  return sampled.length ? sampled : tips;
+}
+
+/* ===== Corazón (shape) - mucho más rápido que emoji ===== */
+function drawTinyHeart(x,y, size, alpha, rot){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(rot);
+  ctx.globalAlpha = alpha;
+
+  ctx.beginPath();
+  const s = size;
+  // corazón simple con curvas (aprox)
+  ctx.moveTo(0, -0.3*s);
+  ctx.bezierCurveTo(0.5*s, -0.9*s, 1.2*s, -0.1*s, 0, 0.85*s);
+  ctx.bezierCurveTo(-1.2*s, -0.1*s, -0.5*s, -0.9*s, 0, -0.3*s);
+  ctx.closePath();
+
+  // relleno rosado suave
+  ctx.fillStyle = "rgba(255,105,180,1)";
+  ctx.fill();
+
+  // borde suave
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,.55)";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ===== Pétalos en las puntas ===== */
+let segs=[], tips=[], petals=[];
+function makePetals(){
+  // Ajusta densidad aquí (menos = más rápido)
+  const PETALS_TOTAL = 1200; // prueba 80–160
+  petals = [];
+  for(let i=0;i<PETALS_TOTAL;i++){
+    const tip = tips[(Math.random()*tips.length)|0];
+    // nacen cerca de la punta pero “aparecen” con crecimiento
+    petals.push({
+      tx: tip.x + rand(-12, 12),
+      ty: tip.y + rand(-12, 12),
+      size: rand(7, 11),
+      rot: rand(-0.8, 0.8),
+      // crecimiento escalonado
+      birth: rand(0.20, 1.15), // cuando aparece (en segundos relativos)
+      life: rand(0.55, 1.20),
+      // micro-movimiento
+      wob: rand(0, Math.PI*2),
+    });
+  }
+}
+
+/* ===== Animación ===== */
+let startTime=0, raf=0;
+function reset(){
+  cancelAnimationFrame(raf);
+
+  const groundY = H*0.83;
+  const rootX = W*0.70;
+  const rootY = groundY;
+
+  segs = buildTreeSegments(rootX, rootY);
+  tips = getBranchTips(segs);
+  makePetals();
+
+  startTime = performance.now();
+  loop();
+}
+
+function loop(){
+  const t = (performance.now() - startTime) / 1000;
+
+  // fondo del canvas
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, "#f8eadc");
+  grad.addColorStop(1, "#f1ddcc");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // suelo
+  const groundY = H*0.83;
+  ctx.strokeStyle = "rgba(70,40,20,.40)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W*0.06, groundY);
+  ctx.lineTo(W*0.94, groundY);
+  ctx.stroke();
+
+  // árbol: crecer más rápido
+  const treeProgress = clamp(t/0.95, 0, 1);
+
+  ctx.lineCap = "round";
+  for(const s of segs){
+    const local = clamp((treeProgress - s.t0) / (s.t1 - s.t0), 0, 1);
+    if(local <= 0) continue;
+
+    const x = lerp(s.x1, s.x2, local);
+    const y = lerp(s.y1, s.y2, local);
+
+    ctx.strokeStyle = "rgba(110,65,35,.95)";
+    ctx.lineWidth = s.w;
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  // pétalos: aparecen en puntas cuando el árbol ya está casi listo
+  const petalsStart = 0.55; // segundos
+  const petalsT = Math.max(0, t - petalsStart);
+
+  for(const p of petals){
+    // progreso de vida del pétalo
+    const appear = clamp((petalsT - p.birth) / p.life, 0, 1);
+    if(appear <= 0) continue;
+
+    // crecimiento suave (scale)
+    const s = p.size * (0.25 + 0.75*appear);
+
+    // “respiración” leve
+    const wob = Math.sin((t*2.2) + p.wob) * 0.8;
+    const x = p.tx + wob;
+    const y = p.ty + Math.cos((t*2.0) + p.wob) * 0.6;
+
+    // alpha suave
+    const alpha = 0.10 + 0.90*appear;
+
+    drawTinyHeart(x, y, s, alpha, p.rot);
+  }
+
+  raf = requestAnimationFrame(loop);
+}
+
+/* ===== Start ===== */
+fit();
+reset();
+</script>
+</body>
+</html>
